@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D Photo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#000;overflow:hidden;height:100%}
+#scene{position:fixed;inset:0;perspective:700px}
+#world{position:absolute;top:50%;left:50%;width:0;height:0;transform-style:preserve-3d}
+.photo{position:absolute;width:320px;height:400px;margin:-200px 0 0 -160px;border:3px solid rgba(0,200,255,.7);border-radius:8px;overflow:hidden;background:#001a2e;box-shadow:0 0 25px rgba(0,200,255,.6);backface-visibility:hidden}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.corridor{position:absolute;top:50%;left:50%;transform-style:preserve-3d;pointer-events:none}
+.floor-line,.wall-line{position:absolute}
+.floor-line{background:rgba(0,200,255,.2);height:1px;width:2000px;left:-1000px;top:180px}
+.wall-line{background:rgba(0,200,255,.15);width:2px;height:400px;top:-20px}
+#vignette{position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.9));pointer-events:none;z-index:40}
+#starfield{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at bottom,#0a1520,#000)}
+#starfield>div{position:absolute;inset:-10%;width:120%;height:120%;animation:tw 2.5s ease-in-out infinite alternate}
+.s1{background:radial-gradient(1px 1px at 10px 20px,#fff,transparent),radial-gradient(1px 1px at 60px 15px,#fff,transparent),radial-gradient(1px 1px at 110px 35px,#fff,transparent),radial-gradient(1px 1px at 160px 45px,#fff,transparent),radial-gradient(1px 1px at 210px 65px,#fff,transparent),radial-gradient(1px 1px at 260px 30px,#fff,transparent),radial-gradient(1px 1px at 310px 40px,#fff,transparent),radial-gradient(1px 1px at 360px 55px,#fff,transparent),radial-gradient(1px 1px at 410px 20px,#fff,transparent),radial-gradient(1px 1px at 460px 50px,#fff,transparent),radial-gradient(1px 1px at 510px 15px,#fff,transparent);background-repeat:repeat;background-size:560px 220px;opacity:.85}
+.s2{background:radial-gradient(1.5px 1.5px at 20px 30px,#fff,transparent),radial-gradient(1.5px 1.5px at 160px 120px,#fff,transparent),radial-gradient(1.5px 1.5px at 300px 100px,#fff,transparent),radial-gradient(1.5px 1.5px at 440px 80px,#fff,transparent);background-repeat:repeat;background-size:600px 300px;opacity:.9;animation-duration:3.5s}
+.s3{background:radial-gradient(2px 2px at 100px 200px,#fff,transparent),radial-gradient(2px 2px at 400px 100px,#fff,transparent),radial-gradient(2px 2px at 700px 150px,#fff,transparent),radial-gradient(2px 2px at 200px 500px,#fff,transparent);background-repeat:repeat;background-size:1100px 700px;animation-duration:5s;filter:drop-shadow(0 0 2px #fff)}
+.s4{background:radial-gradient(3px 3px at 150px 100px,#fff,transparent),radial-gradient(3px 3px at 750px 400px,#fff,transparent),radial-gradient(3px 3px at 300px 500px,#fff,transparent);background-repeat:repeat;background-size:1400px 800px;animation-duration:4s;filter:drop-shadow(0 0 5px #fff)}
+.s5{background:radial-gradient(3.5px 3.5px at 180px 280px,#a5f3fc,transparent),radial-gradient(3.5px 3.5px at 780px 480px,#a5f3fc,transparent),radial-gradient(3.5px 3.5px at 320px 600px,#bae6fd,transparent);background-repeat:repeat;background-size:1500px 900px;animation-duration:6s;filter:drop-shadow(0 0 8px #a5f3fc)}
+@keyframes tw{0%{opacity:.6}100%{opacity:1}}
+#musicBtn{position:fixed;bottom:20px;left:20px;z-index:99;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#06b6d4,#10b981,#06b6d4);background-size:200% 200%;border:1.5px solid rgba(255,255,255,.5);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(6,182,212,.6);animation:gs 4s linear infinite}
+#musicBtn .w{display:flex;align-items:flex-end;gap:3px;height:18px;margin-left:3px}
+#musicBtn .w b{width:2.5px;border-radius:2px;background:#fff;height:4px;opacity:.7}
+#musicBtn.on .w b{opacity:1;animation:wb .9s ease-in-out infinite}
+#musicBtn.on .w b:nth-child(2){animation-delay:.15s}
+#musicBtn.on .w b:nth-child(3){animation-delay:.3s}
+#musicBtn.on .w b:nth-child(4){animation-delay:.45s}
+@keyframes gs{to{background-position:200% 50%}}
+@keyframes wb{0%,100%{height:4px}50%{height:16px}}
+#replay{position:fixed;bottom:20px;right:20px;padding:12px 24px;background:rgba(10,25,41,.75);border:1.5px solid rgba(255,255,255,.4);color:#fff;font:600 .85rem sans-serif;letter-spacing:2px;text-transform:uppercase;cursor:pointer;z-index:100;border-radius:40px;opacity:0;transition:.3s}
+#replay.on{opacity:1;pointer-events:auto}
+#loading{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;color:#0cf;transition:opacity .8s}
+#loading.hide{opacity:0;pointer-events:none}
+.ring{width:70px;height:70px;border:3px solid rgba(0,200,255,.15);border-top-color:#0cf;border-right-color:#0cf;border-radius:50%;animation:sp 1s linear infinite;margin-bottom:25px}
+@keyframes sp{to{transform:rotate(360deg)}}
+#loading p{font:12px monospace;letter-spacing:4px;text-transform:uppercase;opacity:.8}
+#pct{font:700 28px monospace;margin-bottom:15px;text-shadow:0 0 15px #0cf}
+@media(max-width:768px){.photo{width:180px;height:225px;margin:-112px 0 0 -90px}#scene{perspective:500px}}
+@media(max-width:480px){.photo{width:150px;height:188px;margin:-94px 0 0 -75px}#musicBtn{width:46px;height:46px;bottom:15px;left:15px}#replay{padding:10px 18px;font-size:.75rem;bottom:15px;right:15px}}
+</style>
+</head>
+<body>
+<div id="starfield"><div class="s1"></div><div class="s2"></div><div class="s3"></div><div class="s4"></div><div class="s5"></div></div>
+<div id="scene"><div id="world"></div></div>
+<div id="vignette"></div>
+<button id="musicBtn">🎵<span class="w"><b></b><b></b><b></b><b></b></span></button>
+<audio id="bgMusic" loop preload="auto"><source src="lomba-sihir.mp3" type="audio/mpeg">
+<button id="replay">↻ Replay</button>
+<div id="loading"><div class="ring"></div><div id="pct">0%</div><p>Memuat Foto</p></div>
+<script>
+'use strict';
+const N=22, SP=700, SH=260, SEG=3, DUR=45000, HW=320, ANG=35, TD=SP*N;
+const $=id=>document.getElementById(id);
+const world=$('world'), replayBtn=$('replay'), pct=$('pct'), loading=$('loading');
+const PAT=[0,1,0,-1], paths=[];
+
+for(let i=0;i<N;i++){
+  const s=Math.floor(i/SEG), tg=PAT[s%4]*SH, p=(i%SEG)/SEG, t=p*p*(3-2*p);
+  const pv=PAT[Math.max(0,s-1)%4]*SH, off=pv+(tg-pv)*t;
+  const dl=i?off-paths[i-1].o:0, yaw=Math.atan2(dl,SP)*45.8, sd=i%2?-1:1;
+  paths.push({o:off,yaw,px:off+sd*HW,rot:(sd<0?ANG:-ANG)-yaw});
+}
+
+const frag=document.createDocumentFragment(), photos=[];
+for(let i=0;i<N;i++){
+  const d=document.createElement('div'), im=document.createElement('img');
+  d.className='photo'; im.alt='Foto '+(i+1); im.src='kuara-'+(i+1)+'.jpg';
+  d.style.transform=`translate3d(${paths[i].px}px,0,${-i*SP}px) rotateY(${paths[i].rot}deg)`;
+  d.append(im); frag.append(d); photos.push({el:d,img:im});
+}
+world.append(frag);
+
+const corr=document.createElement('div'); corr.className='corridor'; world.append(corr);
+const cf=document.createDocumentFragment();
+for(let i=0;i<N+10;i++){
+  const p=paths[Math.min(i,N-1)], z=-i*SP, t1=`translate3d(${p.o}px,0,${z}px) rotateY(${p.yaw}deg)`;
+  const f=document.createElement('div'); f.className='floor-line'; f.style.transform=t1; cf.append(f);
+  const l=document.createElement('div'); l.className='wall-line'; l.style.left=-HW+'px'; l.style.transform=t1; cf.append(l);
+  const r=document.createElement('div'); r.className='wall-line'; r.style.left=HW+'px'; r.style.transform=t1; cf.append(r);
+}
+corr.append(cf);
+
+const nums=Array.from({length:N},(_,i)=>i+1);
+function shufflePhotos(){
+  for(let i=nums.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[nums[i],nums[j]]=[nums[j],nums[i]]}
+  photos.forEach((p,k)=>{p.img.src=`kuara-${nums[k]}.jpg`;});
+}
+
+let loaded=0;
+for(let i=1;i<=N;i++){
+  const im=new Image();
+  im.onload=im.onerror=()=>{
+    pct.textContent=Math.round(++loaded/N*100)+'%';
+    if(loaded===N){
+      setTimeout(()=>{
+        loading.classList.add('hide');
+        shufflePhotos();
+        setTimeout(start,400);
+      },300);
+    }
+  };
+  im.src=`kuara-${i}.jpg`;
+}
+
+let animId, startTime=0;
+function animate(ts){
+  if(!startTime)startTime=ts;
+  const pr=Math.min((ts-startTime)/DUR,1);
+  world.style.transform=`translateZ(${600+pr*(TD+1000)}px)`;
+  pr<1?animId=requestAnimationFrame(animate):replayBtn.classList.add('on');
+}
+function start(){
+  replayBtn.classList.remove('on');
+  startTime=0;
+  world.style.transform='translateZ(0px)';
+  cancelAnimationFrame(animId);
+  animId=requestAnimationFrame(animate);
+}
+replayBtn.onclick=()=>{shufflePhotos();setTimeout(start,400)};
+
+const mb=$('musicBtn'), bg=$('bgMusic');
+let on=false;
+mb.onclick=()=>{
+  on?(bg.pause(),mb.classList.remove('on'),on=false)
+  :(bg.play().then(()=>{mb.classList.add('on');on=true}).catch(()=>{}));
+};
+
+const L=[['.s1',6],[['.s2',10]],['.s3',16],['.s4',24],['.s5',32]].map(([sel,v])=>[document.querySelector(sel),v]);
+let tb=0,tg=0,cb=0,cg=0;
+const mob=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+const orient=e=>{tb=e.beta||0;tg=e.gamma||0};
+const mouse=e=>{tg=(e.clientX/innerWidth*2-1)*30;tb=(e.clientY/innerHeight*2-1)*30};
+if(mob&&typeof DeviceOrientationEvent!=='undefined'){
+  DeviceOrientationEvent.requestPermission?
+    DeviceOrientationEvent.requestPermission().then(p=>p==='granted'&&addEventListener('deviceorientation',orient,1)).catch(()=>{}):
+    addEventListener('deviceorientation',orient,1);
+}else addEventListener('mousemove',mouse);
+
+(function px(){
+  cb+=(tb-cb)*.08;cg+=(tg-cg)*.08;
+  const b=Math.max(-35,Math.min(35,cb)), g=Math.max(-35,Math.min(35,cg));
+  L.forEach(([el,v])=>{if(el)el.style.transform=`translate3d(${-g/90*v}px,${-b/90*v}px,0)`});
+  requestAnimationFrame(px);
+})();
+</script>
+</body>
+</html>
