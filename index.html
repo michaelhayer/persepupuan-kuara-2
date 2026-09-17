@@ -33,7 +33,7 @@ html,body{background:#000;overflow:hidden;height:100%}
 #musicBtn.on .w b:nth-child(4){animation-delay:.45s}
 @keyframes gs{to{background-position:200% 50%}}
 @keyframes wb{0%,100%{height:4px}50%{height:16px}}
-#replay{position:fixed;bottom:20px;right:20px;padding:12px 24px;background:rgba(10,25,41,.75);border:1.5px solid rgba(255,255,255,.4);color:#fff;font:600 .85rem sans-serif;letter-spacing:2px;text-transform:uppercase;cursor:pointer;z-index:100;border-radius:40px;opacity:0;transition:.3s}
+#replay{position:fixed;bottom:20px;right:20px;padding:12px 24px;background:rgba(10,25,41,.75);border:1.5px solid rgba(255,255,255,.4);color:#fff;font:600 .85rem sans-serif;letter-spacing:2px;text-transform:uppercase;cursor:pointer;z-index:100;border-radius:40px;opacity:0;pointer-events:none;transition:.3s}
 #replay.on{opacity:1;pointer-events:auto}
 #loading{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;color:#0cf;transition:opacity .8s}
 #loading.hide{opacity:0;pointer-events:none}
@@ -50,7 +50,7 @@ html,body{background:#000;overflow:hidden;height:100%}
 <div id="scene"><div id="world"></div></div>
 <div id="vignette"></div>
 <button id="musicBtn">🎵<span class="w"><b></b><b></b><b></b><b></b></span></button>
-<audio id="bgMusic" loop preload="auto"><source src="lomba-sihir.mp3" type="audio/mpeg">
+<audio id="bgMusic" loop preload="auto"><source src="lomba-sihir.mp3" type="audio/mpeg"></audio>
 <button id="replay">↻ Replay</button>
 <div id="loading"><div class="ring"></div><div id="pct">0%</div><p>Memuat Foto</p></div>
 <script>
@@ -67,15 +67,17 @@ for(let i=0;i<N;i++){
   paths.push({o:off,yaw,px:off+sd*HW,rot:(sd<0?ANG:-ANG)-yaw});
 }
 
+// Buat elemen foto
 const frag=document.createDocumentFragment(), photos=[];
 for(let i=0;i<N;i++){
   const d=document.createElement('div'), im=document.createElement('img');
-  d.className='photo'; im.alt='Foto '+(i+1); im.src='kuara-'+(i+1)+'.jpg';
+  d.className='photo'; im.alt='Foto '+(i+1);
   d.style.transform=`translate3d(${paths[i].px}px,0,${-i*SP}px) rotateY(${paths[i].rot}deg)`;
   d.append(im); frag.append(d); photos.push({el:d,img:im});
 }
 world.append(frag);
 
+// Koridor
 const corr=document.createElement('div'); corr.className='corridor'; world.append(corr);
 const cf=document.createDocumentFragment();
 for(let i=0;i<N+10;i++){
@@ -86,61 +88,98 @@ for(let i=0;i<N+10;i++){
 }
 corr.append(cf);
 
+// Acak urutan foto
 const nums=Array.from({length:N},(_,i)=>i+1);
 function shufflePhotos(){
   for(let i=nums.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[nums[i],nums[j]]=[nums[j],nums[i]]}
   photos.forEach((p,k)=>{p.img.src=`kuara-${nums[k]}.jpg`;});
 }
 
-let loaded=0;
-for(let i=1;i<=N;i++){
-  const im=new Image();
-  im.onload=im.onerror=()=>{
-    pct.textContent=Math.round(++loaded/N*100)+'%';
-    if(loaded===N){
-      setTimeout(()=>{
-        loading.classList.add('hide');
-        shufflePhotos();
-        setTimeout(start,400);
-      },300);
-    }
-  };
-  im.src=`kuara-${i}.jpg`;
+// Preload gambar
+let loaded=0, allLoaded=false;
+const imgCache={};
+
+function preloadImages(cb){
+  loaded=0; allLoaded=false;
+  for(let i=1;i<=N;i++){
+    const im=new Image();
+    im.onload=im.onerror=()=>{
+      imgCache[i]=im.src;
+      pct.textContent=Math.round(++loaded/N*100)+'%';
+      if(loaded===N){
+        allLoaded=true;
+        if(cb)cb();
+      }
+    };
+    im.src=`kuara-${i}.jpg`;
+  }
 }
 
-let animId, startTime=0;
+// Animasi
+let animId=null, startTime=0, running=false;
 function animate(ts){
+  if(!running)return;
   if(!startTime)startTime=ts;
   const pr=Math.min((ts-startTime)/DUR,1);
   world.style.transform=`translateZ(${600+pr*(TD+1000)}px)`;
-  pr<1?animId=requestAnimationFrame(animate):replayBtn.classList.add('on');
+  if(pr<1){
+    animId=requestAnimationFrame(animate);
+  }else{
+    running=false;
+    replayBtn.classList.add('on');
+  }
 }
 function start(){
   replayBtn.classList.remove('on');
   startTime=0;
   world.style.transform='translateZ(0px)';
-  cancelAnimationFrame(animId);
+  if(animId)cancelAnimationFrame(animId);
+  running=true;
   animId=requestAnimationFrame(animate);
 }
-replayBtn.onclick=()=>{shufflePhotos();setTimeout(start,400)};
+function stop(){
+  running=false;
+  if(animId){cancelAnimationFrame(animId);animId=null;}
+}
 
+replayBtn.onclick=()=>{
+  stop();
+  replayBtn.classList.remove('on');
+  shufflePhotos();
+  // Tunggu sebentar agar gambar ter-load sebelum mulai
+  setTimeout(()=>{
+    start();
+  },100);
+};
+
+// Musik
 const mb=$('musicBtn'), bg=$('bgMusic');
 let on=false;
 mb.onclick=()=>{
-  on?(bg.pause(),mb.classList.remove('on'),on=false)
-  :(bg.play().then(()=>{mb.classList.add('on');on=true}).catch(()=>{}));
+  if(on){
+    bg.pause(); mb.classList.remove('on'); on=false;
+  }else{
+    bg.play().then(()=>{mb.classList.add('on'); on=true;}).catch(()=>{});
+  }
 };
 
-const L=[['.s1',6],[['.s2',10]],['.s3',16],['.s4',24],['.s5',32]].map(([sel,v])=>[document.querySelector(sel),v]);
+// Efek parallax
+const L=[['.s1',6],['.s2',10],['.s3',16],['.s4',24],['.s5',32]].map(([sel,v])=>[document.querySelector(sel),v]);
 let tb=0,tg=0,cb=0,cg=0;
 const mob=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 const orient=e=>{tb=e.beta||0;tg=e.gamma||0};
 const mouse=e=>{tg=(e.clientX/innerWidth*2-1)*30;tb=(e.clientY/innerHeight*2-1)*30};
 if(mob&&typeof DeviceOrientationEvent!=='undefined'){
-  DeviceOrientationEvent.requestPermission?
-    DeviceOrientationEvent.requestPermission().then(p=>p==='granted'&&addEventListener('deviceorientation',orient,1)).catch(()=>{}):
+  if(DeviceOrientationEvent.requestPermission){
+    DeviceOrientationEvent.requestPermission().then(p=>{
+      if(p==='granted')addEventListener('deviceorientation',orient,1);
+    }).catch(()=>{});
+  }else{
     addEventListener('deviceorientation',orient,1);
-}else addEventListener('mousemove',mouse);
+  }
+}else{
+  addEventListener('mousemove',mouse);
+}
 
 (function px(){
   cb+=(tb-cb)*.08;cg+=(tg-cg)*.08;
@@ -148,6 +187,15 @@ if(mob&&typeof DeviceOrientationEvent!=='undefined'){
   L.forEach(([el,v])=>{if(el)el.style.transform=`translate3d(${-g/90*v}px,${-b/90*v}px,0)`});
   requestAnimationFrame(px);
 })();
+
+// Mulai preload
+preloadImages(()=>{
+  setTimeout(()=>{
+    loading.classList.add('hide');
+    shufflePhotos();
+    setTimeout(start,400);
+  },300);
+});
 </script>
 </body>
 </html>
